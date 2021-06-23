@@ -4,14 +4,24 @@
 #include <string>
 #include <tuple>
 #include <algorithm>
+#include <map>
 
 using namespace std;
 
 #include "Image.hpp"
 
-int height = 400, width = 400;
+int height = 1000, width = 1000;
+pix White = {255,255,255}, Red = {255,0,0}, Green = {0,255,0}, Black = {0,0,0};
 
-void drawLine(int x1,int y1, int x2, int y2, Image &img, pix &Col) {
+void drawLine(int x1,int y1, int x2, int y2, Image &img, pix &Col, map<int, vector<int> > *mp = nullptr) {
+
+    if(x1 == x2 && y1 == y2) {
+        img.SetPixel(x1,x2,Col);
+        if(mp != nullptr) {
+            (*mp)[y1].push_back(x1);
+        }
+        return;
+    }
 
     bool steep = 0;
     if(abs(y2-y1) > abs(x2-x1)) {
@@ -26,7 +36,7 @@ void drawLine(int x1,int y1, int x2, int y2, Image &img, pix &Col) {
     
     int A = (y2-y1), B = (x2-x1), C = x2*y1 - x1*y2;
     
-    for(int X = x1; X != x2; ++X) {
+    for(int X = x1; X <= x2; ++X) {
         int D = C + X*A;
         int Y1 = ceil((double)D/B), Y2 = D/B;
 
@@ -39,6 +49,8 @@ void drawLine(int x1,int y1, int x2, int y2, Image &img, pix &Col) {
             swap(rX,rY);
         
         img.SetPixel(rX,rY,Col);
+        if(mp != nullptr)
+            (*mp)[rY].push_back(rX);
     }
 
 }
@@ -93,6 +105,27 @@ int translate(double x, int len) {
     return ans;
 }
 
+void drawTriangle(vector<int> p1, vector<int> p2, vector<int> p3, Image &img, pix &Col) {
+    vector<vector<int>> points = {p1,p2,p3};
+    sort(points.begin(), points.end(), [](vector<int> &a, vector<int> &b){
+        return a[1] > b[1];
+    });
+    map<int, vector<int>> mp;
+    drawLine(p1[0],p1[1],p2[0],p2[1],img,Col, &mp);
+    drawLine(p2[0],p2[1],p3[0],p3[1],img,Col, &mp);
+    drawLine(p1[0],p1[1],p3[0],p3[1],img,Col, &mp);
+
+    for(auto p: mp) {
+        sort(p.second.begin(), p.second.end());
+        int i1=p.second[0], i2 = p.second[(int)p.second.size()-1], j = p.first;
+                for(int i=i1;i<=i2;++i) {
+            img.SetPixel(i,j,Col);
+        }
+    }
+
+
+}
+
 void human(Image &img, pix &Col) {
     for(auto face: trianglesIndices) {
         int i1 = get<0>(face), i2 = get<1>(face), i3 = get<2>(face);
@@ -100,37 +133,22 @@ void human(Image &img, pix &Col) {
         int x2 = translate(vertices[i2].first, width), y2 = translate(vertices[i2].second, height);
         int x3 = translate(vertices[i3].first, width), y3 = translate(vertices[i3].second, height);
 
-        drawLine(x1,y1,x2,y2, img, Col);
-        drawLine(x2,y2,x3,y3, img, Col);
-        drawLine(x1,y1,x3,y3, img, Col);
+        pix CC = {rand()%256, rand()%256, rand()%256};
+        drawTriangle({x1,y1}, {x2,y2}, {x3,y3}, img, CC);
+        // drawLine(x1,y1,x2,y2, img, Black);
+        // drawLine(x2,y2,x3,y3, img, Black);
+        // drawLine(x1,y1,x3,y3, img, Black);
     }
-}
-
-void drawTriangle(vector<int> p1, vector<int> p2, vector<int> p3, Image &img, pix &Col) {
-    vector<vector<int>> points = {p1,p2,p3};
-    sort(points.begin(), points.end(), [](vector<int> &a, vector<int> &b){
-        return a[1] > b[1];
-    });
-
-    drawLine(p1[0],p1[1],p2[0],p2[1],img,Col);
-    drawLine(p2[0],p2[1],p3[0],p3[1],img,Col);
-    drawLine(p1[0],p1[1],p3[0],p3[1],img,Col);
 }
 
 int main() {
     
     Image img("img.bmp", height, width);
-    pix Col = {0, 255, 255};
+    pix Col = {84,253,227};
 
-    // readFile();
-    // human(img, Col);
+    readFile();
+    human(img, Col);
 
-    pix White = {255,255,255}, Red = {255,0,0}, Green = {0,255,0};
-    drawTriangle({10,70}, {50,160}, {70,80}, img, Red);
-    drawTriangle({180,50}, {150,1}, {70,180}, img, White);
-    drawTriangle({180,150}, {120,160}, {130,180}, img, Green);
-    
-    
     img.Generate();
 
     return 0;

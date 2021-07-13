@@ -9,12 +9,20 @@
 using namespace std;
 
 #include "Image.hpp"
+#include "Vector.hpp"
+
+template<class T>
+double abs(Vec3<T> &V);
 
 int height = 1000, width = 1000;
 pix White = {255,255,255}, Red = {255,0,0}, Green = {0,255,0}, Black = {0,0,0};
 
-void drawLine(int x1,int y1, int x2, int y2, Image &img, pix &Col, map<int, vector<int> > *mp = nullptr) {
+void drawLine(Vec2i P1, Vec2i P2, Image &img, pix &Col, map<int, vector<int> > *mp = nullptr) {
 
+    int x1 = P1.x, x2 = P2.x;
+    int y1 = P1.y, y2 = P2.y;
+    
+    // If both the points coincide then handle the case seperately.
     if(x1 == x2 && y1 == y2) {
         img.SetPixel(x1,x2,Col);
         if(mp != nullptr) {
@@ -71,12 +79,12 @@ vector<string> split(string s, char ch) {
     return ans;
 }
 
-vector<pair<double, double>> vertices;
+vector<Vec3f> vertices;
 vector<tuple<int, int, int>> trianglesIndices;
 
 void readFile() {
 
-    fstream oin("data.txt", ios::in);
+    fstream oin("data.obj", ios::in);
 
     while (oin) {
 
@@ -88,8 +96,8 @@ void readFile() {
         vector<string> dat = split(s, ' ');
 
         if(id == "v ") {
-            double x = stod(dat[1]), y = stod(dat[2]);
-            vertices.push_back({x,y});
+            double x = stod(dat[1]), y = stod(dat[2]), z = stod(dat[3]);
+            vertices.push_back({x,y,z});
         }
         else if(id == "f ") {
             int a = stoi(split(dat[1],'/')[0]), b = stoi(split(dat[2],'/')[0]), c = stoi(split(dat[3], '/')[0]);
@@ -105,36 +113,38 @@ int translate(double x, int len) {
     return ans;
 }
 
-void drawTriangle(vector<int> p1, vector<int> p2, vector<int> p3, Image &img, pix &Col) {
-    vector<vector<int>> points = {p1,p2,p3};
-    sort(points.begin(), points.end(), [](vector<int> &a, vector<int> &b){
-        return a[1] > b[1];
-    });
+void drawTriangle(Vec2i p1, Vec2i p2, Vec2i p3, Image &img, pix &Col) {
     map<int, vector<int>> mp;
-    drawLine(p1[0],p1[1],p2[0],p2[1],img,Col, &mp);
-    drawLine(p2[0],p2[1],p3[0],p3[1],img,Col, &mp);
-    drawLine(p1[0],p1[1],p3[0],p3[1],img,Col, &mp);
+    drawLine(p1,p2,img,Col, &mp);
+    drawLine(p2,p3,img,Col, &mp);
+    drawLine(p1,p3,img,Col, &mp);
 
     for(auto p: mp) {
         sort(p.second.begin(), p.second.end());
         int i1=p.second[0], i2 = p.second[(int)p.second.size()-1], j = p.first;
-                for(int i=i1;i<=i2;++i) {
+        for(int i=i1;i<=i2;++i) {
             img.SetPixel(i,j,Col);
         }
     }
-
-
 }
+
+Vec3f light_dir = {0,0,-1};
 
 void human(Image &img, pix &Col) {
     for(auto face: trianglesIndices) {
         int i1 = get<0>(face), i2 = get<1>(face), i3 = get<2>(face);
-        int x1 = translate(vertices[i1].first, width), y1 = translate(vertices[i1].second, height);
-        int x2 = translate(vertices[i2].first, width), y2 = translate(vertices[i2].second, height);
-        int x3 = translate(vertices[i3].first, width), y3 = translate(vertices[i3].second, height);
+        int x1 = translate(vertices[i1].x, width), y1 = translate(vertices[i1].y, height);
+        int x2 = translate(vertices[i2].x, width), y2 = translate(vertices[i2].y, height);
+        int x3 = translate(vertices[i3].x, width), y3 = translate(vertices[i3].y, height);
 
-        pix CC = {rand()%256, rand()%256, rand()%256};
+        Vec3f Normal = (vertices[i3] - vertices[i1])^(vertices[i2] - vertices[i1]);
+        double intensity = light_dir*(Normal/abs(Normal));
+
+        // pix CC = {rand()%256, rand()%256, rand()%256};
+        if(intensity > 0) {
+        pix CC = {White.r*intensity, White.g*intensity, White.b*intensity};
         drawTriangle({x1,y1}, {x2,y2}, {x3,y3}, img, CC);
+        }
         // drawLine(x1,y1,x2,y2, img, Black);
         // drawLine(x2,y2,x3,y3, img, Black);
         // drawLine(x1,y1,x3,y3, img, Black);
